@@ -217,6 +217,8 @@ JSON output for a run is its record. `start`, `follow`, `retry` and `done` print
 
 When the first argument is not a built-in command, muster looks for an executable `muster-<name>` in `MUSTER_DIR/plugins`, then on `PATH`, and replaces itself with it, passing the remaining arguments. The plugin's environment gains `MUSTER_DIR`, `MUSTER_CONFIG`, `MUSTER_STATE` and `MUSTER_BIN`. Plugins read state through `muster status -o json` and change it through muster commands, never by editing `state.json`.
 
+The repository ships one plugin, `muster-obsidian`, which uses a folder of Obsidian notes as a source. `docs/obsidian.md` describes it.
+
 ## Presets
 
 A preset is a `config.toml` plus the scripts its hooks call, kept under `presets/<name>/`. A user copies one into `MUSTER_DIR` and edits it. Presets are examples, not part of the core.

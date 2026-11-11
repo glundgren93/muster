@@ -53,11 +53,12 @@ Work through these in order. Each slice should end with the checks in "Definitio
 
 ### 3. Slice 3: Obsidian source plugin
 
-- [ ] `cmd/muster-obsidian`: scan a folder of task notes with a `status` property; a note set to `now` becomes `muster start --source obsidian:<path>`; run status is written back to the note.
-- [ ] Decide where a follow-up instruction lives in a note, and map it to `muster follow`.
-- [ ] Test on fixture notes only.
-- [ ] Try the Obsidian Bases Kanban view (native since Obsidian 1.14) on a copy of real notes: group by `status`, drag a card, confirm the frontmatter changes. This has only been read about, not tried.
-- [ ] Write a one-time converter from the owner's current Kanban board file to task notes. Run it only with the owner's approval.
+- [x] `cmd/muster-obsidian`: scan a folder of task notes with a `status` property; a note set to `now` becomes `muster start --source obsidian:<path>`; run status is written back to the note. Documented in `docs/obsidian.md`.
+- [x] Decide where a follow-up instruction lives in a note, and map it to `muster follow`: a `follow_up` property, sent when `status` is `now` and the run has stopped, then removed.
+- [x] Test on fixture notes only. Unit tests on fixtures plus an end-to-end test through both binaries; also driven by hand against a live pi agent with notes in a temporary folder.
+- [ ] Try the Obsidian Bases Kanban view (native since Obsidian 1.14) on a copy of real notes: group by `status`, drag a card, confirm the frontmatter changes. Not done: it needs the Obsidian app driven by hand, which this session could not do. `docs/obsidian.md` has a `.base` file to try; the view type `kanban` and the `groupBy: {property, direction}` keys were read from Obsidian 1.15's bundled code.
+- [x] Write a one-time converter from the owner's current Kanban board file to task notes: `muster obsidian import-board`. Tested on a fixture board only. Run it only with the owner's approval.
+- [ ] The owner's board (`~/Documents/Obsidian Vault/Agent board.md`) and the old dispatcher do not exist on the machine slices 1 to 4 were built on (its only vault is `~/Documents/vault/vault`, with no board), so the converter has not seen the real board. Check its output on a copy before moving notes into the vault.
 
 ### 4. Slice 4: release
 
