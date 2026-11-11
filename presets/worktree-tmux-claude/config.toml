@@ -1,0 +1,16 @@
+max_running = 3
+interval = "10s"
+start_grace = "60s"
+default_model = ""
+
+[hooks]
+start_agent = '"$MUSTER_DIR/hooks/start-agent.sh"'
+agent_status = '"$MUSTER_DIR/hooks/agent-status.sh"'
+read_agent = '"$MUSTER_DIR/hooks/read-agent.sh"'
+send_agent = '"$MUSTER_DIR/hooks/send-agent.sh"'
+stop_agent = '"$MUSTER_DIR/hooks/stop-agent.sh"'
+last_report = '"$MUSTER_DIR/hooks/last-report.sh"'
+
+[hooks.create_workspace]
+command = '"$MUSTER_DIR/hooks/create-worktree.sh" ~/git/my-project'
+timeout = "2m"

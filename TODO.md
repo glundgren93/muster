@@ -18,7 +18,7 @@ muster is a Go CLI that hands tasks to coding agents running in terminal panes, 
 
 ## Current state
 
-Slice 1 is done: the core run manager builds, is tested, and was driven by hand.
+All four slices are done; the open items left are marked `[ ]` below and in "Ask the owner before".
 
 | Area | State |
 |---|---|
@@ -26,7 +26,9 @@ Slice 1 is done: the core run manager builds, is tested, and was driven by hand.
 | `internal/layout`, `config`, `state`, `hook`, `engine`, `plugin` | reviewed, fixed, tested |
 | `internal/cli`, `cmd/muster` | slice 1 commands: `start`, `status`, `tick`, `watch`, `done`, `retry`, `rm`, `doctor`, `version` |
 | Tests | unit tests per package plus an end-to-end test through the built binary |
-| Presets, README, license | missing |
+| Presets | `grove-rex-pi` (verified live), `worktree-tmux-claude` (tmux part unverified) |
+| Obsidian | `cmd/muster-obsidian`: `sync`, `watch`, `import-board` |
+| README, license, skill, release config | written; release never run |
 
 ## Todo
 
@@ -62,9 +64,11 @@ Work through these in order. Each slice should end with the checks in "Definitio
 
 ### 4. Slice 4: release
 
-- [ ] Second preset: git worktree + tmux + Claude Code. Check whether Claude Code and Codex report OSC 7501 status; if not, the preset needs another way to detect idle.
-- [ ] README, an agent skill, a license, goreleaser and a Homebrew tap.
-- [ ] Consider `muster init --preset <name>` with presets embedded in the binary.
+- [x] Second preset: git worktree + tmux + Claude Code. Claude Code 2.1 does report OSC 7501 (`app: claude-code`), seen under Rex. tmux cannot report it, so the preset records state through Claude Code `--settings` hooks; those hooks were verified live. Codex is not installed here, so it was not checked.
+- [ ] Verify `presets/worktree-tmux-claude` with real tmux (not installed on the build machine; its scripts only ran against a fake `tmux`).
+- [x] README, an agent skill (`skills/muster/SKILL.md`), a license (MIT), goreleaser (`.goreleaser.yaml`, `.github/workflows/release.yml`) and a Homebrew tap entry in the goreleaser config. CI in `.github/workflows/ci.yml`.
+- [ ] goreleaser is not installed here, so `.goreleaser.yaml` was only checked as YAML, not with `goreleaser check` or a snapshot build. The tap repository `glundgren93/homebrew-tap` and the `HOMEBREW_TAP_GITHUB_TOKEN` secret do not exist yet.
+- [x] `muster init [PRESET]` with presets embedded in the binary (`presets/presets.go`).
 
 ## Settled design questions
 
@@ -151,8 +155,18 @@ The dispatcher still calls herdr and has failed on every run since the owner mov
 ## Ask the owner before
 
 - Creating or changing `~/.muster`, the Obsidian vault, the launchd job, or the files in the table above.
-- Making the repository public, adding a license, or publishing a release.
+- Making the repository public or publishing a release. (The owner approved the MIT license.)
 - Adding dependencies or changing the module path (`github.com/glundgren93/muster`).
+
+Prepared and waiting for the owner:
+
+1. Install the binaries: `go install ./cmd/muster ./cmd/muster-obsidian` from the repository.
+2. Set up `~/.muster`: `muster init grove-rex-pi`, then edit the grove preset name in `~/.muster/config.toml` and, for `pia`, `~/.muster/hooks/run-pi.sh`.
+3. Convert the board into a new folder and review it before moving anything: `muster obsidian import-board "<vault>/Agent board.md" --out "<vault>/Tasks-muster" --vault "<vault>"`.
+4. Replace the launchd job: unload the old one if it exists (`launchctl unload ~/Library/LaunchAgents/com.gabriel.todo-dispatch.plist`), write the plist from `docs/obsidian.md`, and `launchctl load` it.
+5. Try the Bases Kanban view with the `.base` file in `docs/obsidian.md`.
+6. Before going public: delete this file, then `gh repo edit glundgren93/muster --visibility public --accept-visibility-change-consequences`.
+7. Release: create `glundgren93/homebrew-tap`, add a `HOMEBREW_TAP_GITHUB_TOKEN` secret to this repository, then `git tag v0.1.0 && git push origin v0.1.0`.
 
 ## Prior art
 

@@ -206,6 +206,7 @@ Every command that prints runs accepts `-o table` (default) or `-o json`. A `RUN
 | `muster done RUN` | Mark the run done. |
 | `muster retry RUN` | Queue a failed run and dispatch. |
 | `muster rm RUN` | Delete the record and `runs/<id>`. Refuses for `starting` or `running` unless `--force`. Leaves the workspace and the agent alone. |
+| `muster init [PRESET]` | Copy a preset's `config.toml` and hook scripts into `MUSTER_DIR`, refusing to overwrite existing files unless `--force`. Without `PRESET`, list the presets. |
 | `muster doctor` | Check the configuration, required hooks and state file, and report runs stuck in `starting`. Exits non-zero on a problem. |
 | `muster version` | Print the version. |
 
@@ -221,7 +222,7 @@ The repository ships one plugin, `muster-obsidian`, which uses a folder of Obsid
 
 ## Presets
 
-A preset is a `config.toml` plus the scripts its hooks call, kept under `presets/<name>/`. A user copies one into `MUSTER_DIR` and edits it. Presets are examples, not part of the core.
+A preset is a `config.toml` plus the scripts its hooks call, kept under `presets/<name>/` and embedded in the binary. `muster init PRESET` copies one into `MUSTER_DIR`, where the user edits it. Hook commands in a preset refer to their scripts as `"$MUSTER_DIR/hooks/..."`. Presets are examples, not part of the core.
 
 ## Out of scope for v1
 

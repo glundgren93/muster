@@ -144,3 +144,22 @@ func TestBadConfigIsReported(t *testing.T) {
 		t.Fatalf("status with a typo in config: %v %s", err, stderr)
 	}
 }
+
+func TestInitCopiesAPresetWithoutOverwriting(t *testing.T) {
+	c := shell{t: t, dir: t.TempDir()}
+	c.must("init", "grove-rex-pi")
+	info, err := os.Stat(filepath.Join(c.dir, "hooks", "start-agent.sh"))
+	if err != nil || info.Mode().Perm()&0o111 == 0 {
+		t.Fatalf("hook not installed as an executable: %v %v", info, err)
+	}
+	if out := c.must("doctor"); !strings.Contains(out, "hook start_agent configured") {
+		t.Fatalf("doctor after init:\n%s", out)
+	}
+	c.write("config.toml", "max_running = 1\n", 0o644)
+	if _, stderr, err := c.run("init", "grove-rex-pi"); err == nil || !strings.Contains(stderr, "--force") {
+		t.Fatalf("second init: %v %s", err, stderr)
+	}
+	if data, _ := os.ReadFile(filepath.Join(c.dir, "config.toml")); string(data) != "max_running = 1\n" {
+		t.Fatal("init overwrote an edited config")
+	}
+}

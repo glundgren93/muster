@@ -7,8 +7,7 @@ Requires `gw`, `rex`, `pi` and `jq` on `PATH`. The notification hook uses `osasc
 ## Install
 
 ```sh
-mkdir -p ~/.muster
-cp -R presets/grove-rex-pi/. ~/.muster/
+muster init grove-rex-pi
 muster doctor
 ```
 

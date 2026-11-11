@@ -1,0 +1,61 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: muster
+    main: ./cmd/muster
+    binary: muster
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/glundgren93/muster/internal/cli.version={{.Version}}
+  - id: muster-obsidian
+    main: ./cmd/muster-obsidian
+    binary: muster-obsidian
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - docs/*
+      - skills/**/*
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+brews:
+  - name: muster
+    repository:
+      owner: glundgren93
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/glundgren93/muster
+    description: Hand tasks to coding agents in terminal panes and track them until they need you
+    license: MIT
+    install: |
+      bin.install "muster"
+      bin.install "muster-obsidian"
+    test: |
+      system "#{bin}/muster", "version"
