@@ -44,18 +44,19 @@ changelog:
       - "^docs:"
       - "^test:"
 
-brews:
+homebrew_casks:
   - name: muster
     repository:
       owner: glundgren93
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
     homepage: https://github.com/glundgren93/muster
     description: Hand tasks to coding agents in terminal panes and track them until they need you
     license: MIT
-    install: |
-      bin.install "muster"
-      bin.install "muster-obsidian"
-    test: |
-      system "#{bin}/muster", "version"
+    binaries: [muster, muster-obsidian]
+    custom_block: |
+      postflight do
+        if OS.mac?
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/muster", "#{staged_path}/muster-obsidian"]
+        end
+      end
