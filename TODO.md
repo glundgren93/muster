@@ -44,11 +44,12 @@ Work through these in order. Each slice should end with the checks in "Definitio
 
 ### 2. Slice 2: worker access, follow-ups, Rex preset
 
-- [ ] `muster read`, `muster send` (refuses when the agent is `blocked` unless `--force`), `muster follow`.
-- [ ] Dispatch of a later session: `last_report`, `stop_agent`, the follow-up prompt.
-- [ ] `presets/grove-rex-pi/`: `config.toml` plus hook scripts, using the Rex commands in "Rex contract".
-- [ ] Verify the preset live with a real pi agent and a trivial prompt, using a temporary `MUSTER_DIR` and a temporary directory as the workspace (not `gw create`, which runs a slow setup hook). Record which states pi reports at startup and after finishing, and whether `start_grace` is needed.
-- [ ] Confirm how to submit a message to pi's input through Rex: `rex send` with a trailing carriage return, or `rex send` followed by `rex send-key`.
+- [x] `muster read`, `muster send` (refuses when the agent is `blocked` unless `--force`), `muster follow`.
+- [x] Dispatch of a later session: `last_report`, `stop_agent`, the follow-up prompt.
+- [x] `presets/grove-rex-pi/`: `config.toml` plus hook scripts, using the Rex commands in "Rex contract".
+- [x] Verify the preset live with a real pi agent and a trivial prompt, using a temporary `MUSTER_DIR` and a temporary directory as the workspace (not `gw create`, which runs a slow setup hook). Record which states pi reports at startup and after finishing, and whether `start_grace` is needed. Recorded under "Rex contract".
+- [x] Confirm how to submit a message to pi's input through Rex: `rex send` with a trailing carriage return, or `rex send` followed by `rex send-key`. Both work; the preset uses `rex send -- TEXT` then `rex send-key enter`, which keeps a multi-line message as one.
+- [ ] Not verified live: `create-workspace.sh` against real `gw create` (checked only with a fake `gw`), the `blocked` state (pi was never seen blocked), and `notify.sh` actually showing a notification.
 
 ### 3. Slice 3: Obsidian source plugin
 
@@ -121,13 +122,16 @@ Verified live against a throwaway session. Rex calls a session what muster calls
 | Start | `rex new LABEL -c DIR --json -- COMMAND...` | JSON with `.session_id` and `.initial_windows[0].block_ids[0]`; the session is not shown in the app automatically |
 | Status | `rex block call -s SESSION -b BLOCK program_status` | `{"records":[{"state":"working","app":"pi",...}]}`; the root record has `"id": null` |
 | Read | `rex capture -s SESSION -b BLOCK --trim` | screen and scrollback as text |
+| Submit | `rex send -s SESSION -b BLOCK -- TEXT` then `rex send-key -s SESSION -b BLOCK enter` | one message, newlines kept |
 | Send | `rex send -s SESSION -b BLOCK TEXT` | raw input; a trailing newline submitted a line to a shell `read` |
 | Stop | `rex kill SESSION` | exit 0 |
 | Gone | any of the above after the kill | exit 3, `... not found` |
 
-States come from the OSC 7501 program status protocol: `idle`, `working`, `done`, `blocked`, `error`. pi reports them under Rex without extra setup. Not yet observed: what pi reports right after launch and after finishing a task, and what an empty `records` list should map to (probably `unknown`).
+States come from the OSC 7501 program status protocol: `idle`, `working`, `done`, `blocked`, `error`. pi reports them under Rex without extra setup.
 
-Rex runs commands through the login shell but not interactive startup files unless `--interactive` is passed. The owner starts pi through a zsh function `pia` defined in `~/.zshrc`, so the owner's personal start command needs `--interactive` or an explicit `zsh -ic`.
+Observed in slice 2 with pi 1.5 started with a prompt argument: `records` is empty for about two seconds after launch (mapped to `unknown`, which muster ignores), then `working`, then `done` once pi has answered; `done` persists until the next message, which goes back to `working`. pi never reported `idle` in these runs, so `start_grace` is a safeguard rather than a need for this preset. `rex send TEXT` with a trailing `\r` submits, and so does `rex send TEXT` followed by `rex send-key enter`; `rex send -- TEXT` accepts text starting with `-`. `rex kill` of an already killed session exits 3 with `not found`.
+
+Rex runs commands through the login shell but not interactive startup files unless `--interactive` is passed. The owner starts pi through a zsh function `pia` defined in `~/.zshrc`, so the owner's personal start command needs `--interactive` or an explicit `zsh -ic`; `presets/grove-rex-pi/README.md` shows the edit to `run-pi.sh`. (`pia` is not defined on the machine slices 1 to 4 were built on, so the preset starts plain `pi`.)
 
 ## The system muster replaces
 

@@ -359,3 +359,72 @@ func newVersionCommand() *cobra.Command {
 		},
 	}
 }
+
+func newReadCommand() *cobra.Command {
+	var lines int
+	command := &cobra.Command{
+		Use:   "read RUN",
+		Short: "Print the agent's recent output",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if lines <= 0 {
+				return errors.New("--lines must be positive")
+			}
+			s, err := openSession()
+			if err != nil {
+				return err
+			}
+			output, err := s.engine.Read(cmd.Context(), args[0], lines)
+			if err != nil {
+				return err
+			}
+			_, err = io.WriteString(cmd.OutOrStdout(), output)
+			return err
+		},
+	}
+	command.Flags().IntVarP(&lines, "lines", "n", 80, "number of lines")
+	return command
+}
+
+func newSendCommand() *cobra.Command {
+	var force bool
+	command := &cobra.Command{
+		Use:   "send RUN MESSAGE",
+		Short: "Send text to the live agent",
+		Long:  "Send text to the live agent through send_agent. Refuses when the agent reports blocked, unless --force.",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := openSession()
+			if err != nil {
+				return err
+			}
+			return s.engine.Send(cmd.Context(), args[0], args[1], force)
+		},
+	}
+	command.Flags().BoolVar(&force, "force", false, "send even when the agent is blocked")
+	return command
+}
+
+func newFollowCommand() *cobra.Command {
+	var queue bool
+	var output format
+	command := &cobra.Command{
+		Use:   "follow RUN MESSAGE",
+		Short: "Add a follow-up and start a new agent session for it",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := openSession()
+			if err != nil {
+				return err
+			}
+			run, err := s.engine.Follow(cmd.Context(), args[0], args[1], queue)
+			if err != nil {
+				return err
+			}
+			return printRun(cmd, output, run)
+		},
+	}
+	command.Flags().BoolVar(&queue, "queue", false, "queue the run only; leave dispatch to a later pass")
+	addOutputFlag(command, &output)
+	return command
+}

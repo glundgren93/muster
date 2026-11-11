@@ -74,3 +74,21 @@ func TestTyposAreErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestPresetsLoad(t *testing.T) {
+	paths, err := filepath.Glob("../../presets/*/config.toml")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no presets found: %v", err)
+	}
+	for _, path := range paths {
+		cfg, err := Load(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range RequiredHooks {
+			if _, ok := cfg.Hook(name); !ok {
+				t.Errorf("%s lacks %s", path, name)
+			}
+		}
+	}
+}
