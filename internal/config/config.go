@@ -52,7 +52,7 @@ var defaultHookTimeouts = map[HookName]time.Duration{
 
 var RequiredHooks = []HookName{StartAgent, AgentStatus}
 
-var DispatchHooks = []HookName{PickModel, CreateWorkspace, LastReport, StopAgent, StartAgent}
+var startHooks = []HookName{OnChange, PickModel, CreateWorkspace, LastReport, StopAgent, StartAgent}
 
 type Hook struct {
 	Command string
@@ -81,9 +81,9 @@ func (c Config) Hook(name HookName) (Hook, bool) {
 	return hook, ok
 }
 
-func (c Config) DispatchTimeout() time.Duration {
+func (c Config) StartTimeout() time.Duration {
 	var total time.Duration
-	for _, name := range DispatchHooks {
+	for _, name := range startHooks {
 		if hook, ok := c.Hooks[name]; ok {
 			total += hook.Timeout
 		}

@@ -11,11 +11,14 @@ import (
 )
 
 func (e *Engine) Reconcile(ctx context.Context) ([]Transition, error) {
+	transitions, err := e.expireStarts(ctx)
+	if err != nil {
+		return transitions, err
+	}
 	file, err := e.store.Load()
 	if err != nil {
-		return nil, err
+		return transitions, err
 	}
-	var transitions []Transition
 	for _, run := range file.Runs {
 		if ctx.Err() != nil {
 			break
@@ -29,7 +32,7 @@ func (e *Engine) Reconcile(ctx context.Context) ([]Transition, error) {
 			return transitions, err
 		}
 	}
-	return transitions, nil
+	return transitions, ctx.Err()
 }
 
 func observable(run state.Run) bool {
@@ -49,9 +52,11 @@ func (e *Engine) reconcileRun(ctx context.Context, observed state.Run) ([]Transi
 		}
 		now := e.timestamp()
 		next := reconciledStatus(*run, agentState, now, e.config.StartGrace)
+		if run.AgentState != agentState || (agentState == state.AgentWorking && !run.SeenWorking) {
+			run.UpdatedAt = now
+		}
 		run.AgentState = agentState
 		run.AgentStateAt = now
-		run.UpdatedAt = now
 		if agentState == state.AgentWorking {
 			run.SeenWorking = true
 		}

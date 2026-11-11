@@ -18,7 +18,7 @@ const (
 )
 
 func StuckStarting(cfg config.Config, runs []state.Run, now time.Time) []state.Run {
-	deadline := cfg.DispatchTimeout() + startInterruptedMargin
+	deadline := cfg.StartTimeout() + startInterruptedMargin
 	var stuck []state.Run
 	for _, run := range runs {
 		if run.Status == state.Starting && now.Sub(run.StartingAt) > deadline {
@@ -29,7 +29,7 @@ func StuckStarting(cfg config.Config, runs []state.Run, now time.Time) []state.R
 }
 
 func (e *Engine) Dispatch(ctx context.Context) ([]Transition, error) {
-	transitions, err := e.failStuckStarts(ctx)
+	transitions, err := e.expireStarts(ctx)
 	if err != nil {
 		return transitions, err
 	}
@@ -46,10 +46,10 @@ func (e *Engine) Dispatch(ctx context.Context) ([]Transition, error) {
 			return transitions, err
 		}
 	}
-	return transitions, nil
+	return transitions, ctx.Err()
 }
 
-func (e *Engine) failStuckStarts(ctx context.Context) ([]Transition, error) {
+func (e *Engine) expireStarts(ctx context.Context) ([]Transition, error) {
 	var changes []change
 	err := e.store.Update(func(file *state.File) error {
 		now := e.timestamp()
@@ -101,12 +101,17 @@ func (e *Engine) claimNext(ctx context.Context) (*state.Run, []Transition, error
 }
 
 func (e *Engine) startSession(ctx context.Context, run state.Run) (state.Run, error) {
-	if run.Sessions == 0 && run.Model == "" {
-		model, err := e.chooseModel(ctx, run)
-		if err != nil {
+	if run.Sessions == 0 {
+		if err := e.writePrompt(run, run.Prompt); err != nil {
 			return run, err
 		}
-		run.Model = model
+		if run.Model == "" {
+			model, err := e.chooseModel(ctx, run)
+			if err != nil {
+				return run, err
+			}
+			run.Model = model
+		}
 	}
 	if run.Workspace == "" {
 		workspace, err := e.createWorkspace(ctx, run)
@@ -117,8 +122,10 @@ func (e *Engine) startSession(ctx context.Context, run state.Run) (state.Run, er
 	} else if !isDir(run.Workspace) {
 		return run, fmt.Errorf("workspace %s no longer exists", run.Workspace)
 	}
-	if err := e.writePrompt(run, run.Prompt); err != nil {
-		return run, err
+	if run.Sessions > 0 {
+		if err := e.writePrompt(run, e.followUpPrompt(ctx, run)); err != nil {
+			return run, err
+		}
 	}
 	agent, err := e.startAgent(ctx, run)
 	if err != nil {
@@ -136,7 +143,10 @@ func (e *Engine) chooseModel(ctx context.Context, run state.Run) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return hook.LastLine(output), nil
+	if model := hook.LastLine(output); model != "" {
+		return model, nil
+	}
+	return e.config.DefaultModel, nil
 }
 
 func (e *Engine) createWorkspace(ctx context.Context, run state.Run) (string, error) {
@@ -202,9 +212,16 @@ func (e *Engine) finishStart(ctx context.Context, claimed, started state.Run, st
 			return nil
 		}
 		run.Agent = started.Agent
+		run.AgentState = ""
+		run.AgentStateAt = time.Time{}
 		run.StartedAt = now
 		run.SeenWorking = false
 		run.Sessions++
+		for i := range min(len(claimed.FollowUps), len(run.FollowUps)) {
+			if run.FollowUps[i].SentAt.IsZero() {
+				run.FollowUps[i].SentAt = now
+			}
+		}
 		changes = append(changes, move(run, state.Running, now))
 		return nil
 	})

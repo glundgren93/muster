@@ -31,8 +31,13 @@ func Main(args []string) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	context.AfterFunc(ctx, stop)
 	root.SetArgs(args)
 	if err := root.ExecuteContext(ctx); err != nil {
+		if errors.Is(err, context.Canceled) {
+			fmt.Fprintln(os.Stderr, "muster: interrupted")
+			return 130
+		}
 		fmt.Fprintf(os.Stderr, "muster: %v\n", err)
 		return 1
 	}

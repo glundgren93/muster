@@ -115,7 +115,7 @@ func (r Runner) Run(ctx context.Context, name config.HookName, hook config.Hook,
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	if err == nil {
+	if err == nil || (errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState.Success()) {
 		return stdout.String(), nil
 	}
 	reason := err.Error()

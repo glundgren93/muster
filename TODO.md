@@ -18,18 +18,15 @@ muster is a Go CLI that hands tasks to coding agents running in terminal panes, 
 
 ## Current state
 
-Paused mid-way through slice 1. Nothing below has been tested.
+Slice 1 is done: the core run manager builds, is tested, and was driven by hand.
 
 | Area | State |
 |---|---|
-| `docs/design.md` | written, reviewed by the owner only as a plan summary |
-| `internal/layout`, `config`, `state`, `hook`, `engine`, `plugin` | written; each passes `go vet`; no tests |
-| `internal/cli/cli.go` | does not compile: it calls nine command constructors that do not exist |
-| `cmd/muster/main.go` | missing |
-| Tests | none |
+| `docs/design.md` | open questions settled and recorded (see "Settled design questions") |
+| `internal/layout`, `config`, `state`, `hook`, `engine`, `plugin` | reviewed, fixed, tested |
+| `internal/cli`, `cmd/muster` | slice 1 commands: `start`, `status`, `tick`, `watch`, `done`, `retry`, `rm`, `doctor`, `version` |
+| Tests | unit tests per package plus an end-to-end test through the built binary |
 | Presets, README, license | missing |
-
-The repository does not build as a whole. `go vet ./internal/<pkg>/` passes for the six packages listed.
 
 ## Todo
 
@@ -37,13 +34,13 @@ Work through these in order. Each slice should end with the checks in "Definitio
 
 ### 1. Finish slice 1: core run manager
 
-- [ ] Review the existing `internal/` code against `docs/design.md` before building on it; it was written by a subagent and never reviewed.
-- [ ] Resolve the design questions in "Open design questions" and update `docs/design.md`.
-- [ ] Add the command constructors called from `internal/cli/cli.go`: `start`, `status`, `tick`, `watch`, `done`, `retry`, `rm`, `doctor`, `version`.
-- [ ] Add output: `-o table|json`, the run table, the full run view, the transition list, and `"created"` in `start -o json`.
-- [ ] Add `cmd/muster/main.go`.
-- [ ] Write the tests listed in "Tests wanted".
-- [ ] Drive the built binary by hand against a temporary `MUSTER_DIR` with fake hooks: a run should go queued, running, waiting, done.
+- [x] Review the existing `internal/` code against `docs/design.md` before building on it; it was written by a subagent and never reviewed.
+- [x] Resolve the design questions in "Open design questions" and update `docs/design.md`.
+- [x] Add the command constructors called from `internal/cli/cli.go`: `start`, `status`, `tick`, `watch`, `done`, `retry`, `rm`, `doctor`, `version`.
+- [x] Add output: `-o table|json`, the run table, the full run view, the transition list, and `"created"` in `start -o json`.
+- [x] Add `cmd/muster/main.go`.
+- [x] Write the tests listed in "Tests wanted".
+- [x] Drive the built binary by hand against a temporary `MUSTER_DIR` with fake hooks: a run should go queued, running, waiting, done.
 
 ### 2. Slice 2: worker access, follow-ups, Rex preset
 
@@ -67,17 +64,17 @@ Work through these in order. Each slice should end with the checks in "Definitio
 - [ ] README, an agent skill, a license, goreleaser and a Homebrew tap.
 - [ ] Consider `muster init --preset <name>` with presets embedded in the binary.
 
-## Open design questions
+## Settled design questions
 
-Raised by the subagent that wrote the code. Decide, then make code and design agree.
+Decided in slice 1 and written into `docs/design.md`.
 
-1. **`pick_model` cannot see the prompt.** The design runs it at dispatch step 2, before the prompt file is written at step 5. A model classifier needs the prompt. Likely fix: write the prompt file first.
-2. **Empty `pick_model` output.** The code leaves the model empty; the design reads as "fall back to `default_model`".
-3. **`on_change` scope.** The code fires it on every transition including into `starting` and on creation. The design lists event hooks for `queued`, `running`, `waiting`, `done`, `failed` and is silent on `starting`.
-4. **Stale `starting` runs** are failed only during dispatch, so `status` and `doctor` show them without changing them. Confirm this is wanted.
-5. **Interrupts.** Ctrl-C during a start marks the run `failed` with "interrupted". Confirm, or leave it `queued`.
+1. **`pick_model` sees the prompt.** A first session writes `runs/<id>/prompt.md` before `pick_model` runs.
+2. **Empty `pick_model` output** falls back to `default_model`.
+3. **`on_change`** fires on every transition, including creation and the move into `starting`. `on_<status>` exists only for `queued`, `running`, `waiting`, `done`, `failed`.
+4. **Stale `starting` runs** are failed by every reconcile as well as every dispatch, so `muster status` repairs them; `doctor` only reports.
+5. **Interrupts** fail the run with `<hook>: interrupted` and exit 130; `retry` queues it again. Event hooks still run to completion.
 
-Smaller choices the code made, to confirm during review: a failed start keeps the model and workspace it obtained, so `retry` does not create the workspace again; `finished_at` is set for `failed` as well as `done`; `updated_at` changes on every `agent_status` check; `unknown` is never stored as `agent_state`; `max_running = 0` is allowed.
+Also confirmed or changed during review: a failed start keeps its model and workspace; `finished_at` is set for `done` and `failed` and cleared on requeue; `updated_at` no longer moves on a repeated identical agent observation; `unknown` is never stored; a new session clears `agent_state`; `max_running = 0` pauses dispatch; a `last_report` failure is ignored like a `stop_agent` failure; a hook whose background child keeps stdout open counts as finished (it used to fail with `ErrWaitDelay`).
 
 ## Tests wanted
 
@@ -110,8 +107,9 @@ go test ./... -race -count=1
 
 ## Local environment
 
-- **Go cannot download modules on this machine.** The `go` on `PATH` is a Socket Firewall shim. It assigns the Go binary's path to `GOPATH`, which breaks the module cache location, and Go does not trust the firewall's TLS certificate. Do not bypass the shim.
-- **Workaround in use:** `export GOMODCACHE=$HOME/go/pkg/mod GOPROXY=off` before every go command. The two dependencies were already in the local module cache. `go.sum` was resolved offline, and the four module hashes were checked against `sum.golang.org` by hand.
+- **Go cannot download modules on the original machine.** The `go` on `PATH` there is a Socket Firewall shim. It assigns the Go binary's path to `GOPATH`, which breaks the module cache location, and Go does not trust the firewall's TLS certificate. Do not bypass the shim.
+- **Workaround in use:** `export GOMODCACHE=$HOME/go/pkg/mod GOPROXY=off` before every go command. `go.sum` was resolved offline, and the four module hashes were checked against `sum.golang.org` by hand.
+- On the machine slices 1 to 4 were built on (`~/git/muster`), `go` is Homebrew's Go 1.26 with no shim, and `BurntSushi/toml` was missing from the cache; one `go mod download github.com/BurntSushi/toml` through the default proxy fetched it and verified it against `go.sum`. The workaround above still works there.
 - **Never create or edit `~/.muster` in tests or manual runs.** Set `MUSTER_DIR` to a temporary directory.
 
 ## Rex contract

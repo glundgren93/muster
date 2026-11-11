@@ -45,7 +45,7 @@ timeout = "2m"
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `max_running` | `5` | cap on runs in `starting` or `running` |
+| `max_running` | `5` | cap on runs in `starting` or `running`; `0` pauses dispatch |
 | `interval` | `10s` | time between passes in `muster watch` |
 | `start_grace` | `60s` | how long a new session may report `idle` before the run counts as waiting |
 | `default_model` | empty | model used when neither `--model` nor `pick_model` supplies one |
@@ -66,13 +66,15 @@ A hook is a command string, or a table with `command` and an optional `timeout` 
 | `workspace` | absolute directory, set at first start |
 | `agent` | opaque handle returned by `start_agent` |
 | `status` | see Lifecycle |
-| `agent_state` | last value from `agent_status` |
+| `agent_state` | last value from `agent_status` for the current session; never `unknown`; cleared when a session starts |
 | `agent_state_at` | when `agent_state` was last observed |
 | `seen_working` | whether the current session has reported `working` |
 | `error` | why the run is `failed` |
 | `follow_ups` | list of `{text, created_at, sent_at}`; `sent_at` is absent until a session received it |
 | `sessions` | number of agent sessions started |
 | `created_at`, `queued_at`, `starting_at`, `started_at`, `updated_at`, `finished_at` | RFC 3339 UTC, omitted when unset |
+
+`updated_at` changes on every transition, on a new follow-up, and when the observed agent state changes; a repeated identical observation only moves `agent_state_at`. `finished_at` is set when a run becomes `done` or `failed` and cleared when it is queued again. A failed start keeps the model and workspace it obtained, so `retry` does not pick them again.
 
 The title defaults to the first non-empty line of the prompt, cut to 80 characters. The id defaults to a slug of the title: lower case, runs of other characters become `-`, first six words, at most 48 characters, with `-2`, `-3`, ... appended until unique.
 
@@ -92,37 +94,37 @@ Transitions:
 - `muster start` creates a run as `queued`.
 - Dispatch moves `queued` to `starting`, then to `running` on success or `failed` on any start-hook error.
 - Reconcile moves a run between `running` and `waiting` from the agent's reported state.
-- `muster follow` moves `waiting`, `done` or `failed` to `queued`.
+- `muster follow` moves `waiting`, `done` or `failed` to `queued`; on a `queued` run it only adds the follow-up.
 - `muster retry` moves `failed` to `queued`.
 - `muster done` moves any status except `starting` to `done`.
-- A run left in `starting` for longer than the sum of the start-hook timeouts plus one minute becomes `failed` with the error `start interrupted`.
+- A run left in `starting` for longer than the sum of the timeouts of the configured `on_change`, `pick_model`, `create_workspace`, `last_report`, `stop_agent` and `start_agent` hooks, plus one minute, becomes `failed` with the error `start interrupted`. Every reconcile and every dispatch checks for this, so `muster status` repairs such runs; `muster doctor` only reports them.
+- An interrupt (Ctrl-C or SIGTERM) while start hooks run kills the running hook and sets `failed` with `<hook>: interrupted`. The run is not requeued on its own, because a half-finished `create_workspace` may need a look first; `muster retry` queues it again.
 
 ### Reconcile
 
-For every run in `running` or `waiting` with an `agent` handle, call `agent_status` and apply:
+First fail stale `starting` runs as described above. Then, for every run in `running` or `waiting` with an `agent` handle, call `agent_status` and apply:
 
 | Agent state | Result |
 |---|---|
 | `working` | `running`; set `seen_working` |
 | `blocked`, `done`, `error`, `gone` | `waiting` |
 | `idle` | `waiting` if `seen_working` or the session is older than `start_grace`; otherwise unchanged |
-| `unknown`, or the hook fails | unchanged; log the failure |
+| `unknown`, an unrecognised value, or the hook fails | unchanged, `agent_state` included; log the failure |
 
-`agent_state` and `agent_state_at` are stored on every successful observation. The state names are those of the OSC 7501 program status protocol plus `gone` (the pane no longer exists) and `unknown`.
+`agent_state` and `agent_state_at` are stored on every other observation, also when the status does not change. The state names are those of the OSC 7501 program status protocol plus `gone` (the pane no longer exists) and `unknown`.
 
 ### Dispatch
 
-While fewer than `max_running` runs are `starting` or `running`, take the `queued` run with the oldest `queued_at` and start a session:
+First fail stale `starting` runs. Then, while fewer than `max_running` runs are `starting` or `running`, take the `queued` run with the oldest `queued_at` and start a session:
 
 1. Claim it: set `starting` and `starting_at`.
-2. If `sessions` is 0 and `model` is empty, set the model from `pick_model`, else `default_model`.
+2. If `sessions` is 0: write the prompt to `runs/<id>/prompt.md`, then, if `model` is empty, set the model from `pick_model`. When `pick_model` is not configured or prints nothing, use `default_model`. `pick_model` can therefore read `{prompt_file}`.
 3. If `workspace` is empty, set it from `create_workspace`, or create `workspaces/<id>` when the hook is not configured. A workspace that is set but no longer exists is an error.
-4. If `sessions` is above 0: call `last_report` when configured, then `stop_agent` when configured and `agent` is set. A `stop_agent` failure is logged and ignored.
-5. Write `runs/<id>/prompt.md`. For a first session this is the prompt. For a later one it is the follow-up prompt below.
-6. Call `start_agent` and store the handle.
-7. Set `running`, `started_at`, `seen_working = false`, increment `sessions`, and mark the included follow-ups sent.
+4. If `sessions` is above 0: call `last_report` when configured, then `stop_agent` when configured and `agent` is set, then write the follow-up prompt below to `runs/<id>/prompt.md`. A `last_report` or `stop_agent` failure is logged and ignored; the report is then left out.
+5. Call `start_agent` and store the handle.
+6. Set `running`, `started_at`, `seen_working = false`, clear `agent_state`, increment `sessions`, and mark the included follow-ups sent.
 
-Any error in steps 2 to 6 sets `failed` with the hook name and the last lines of its stderr.
+Any error in steps 2 to 5 sets `failed` with the hook name and the last lines of its stderr. A dispatch pass continues with the next queued run after a failure.
 
 Follow-up prompt:
 
@@ -153,7 +155,7 @@ State changes are read-modify-write under an exclusive lock on `state.lock`, sav
 
 Hooks run through `sh -c` with the working directory set to the run's workspace when it exists, otherwise to `MUSTER_DIR`.
 
-Placeholders are replaced with a single-quoted shell-safe value. A placeholder with no value expands to `''`. Text in braces that is not a placeholder name is left alone. Every value is also exported as an environment variable.
+Placeholders are replaced with a single-quoted shell-safe value. A placeholder with no value expands to `''`. Text in braces that is not a placeholder name is left alone. Every value is also exported as an environment variable. Because the value arrives already quoted, a placeholder must stand outside any quotes: write `echo {title}`, not `echo "{title}"`; inside a quoted string use the environment variable, as in `echo "title: $MUSTER_TITLE"`.
 
 | Placeholder | Environment | Value |
 |---|---|---|
@@ -171,6 +173,8 @@ Placeholders are replaced with a single-quoted shell-safe value. A placeholder w
 
 `MUSTER_DIR` and `MUSTER_BIN` (the muster executable) are always set.
 
+A hook runs in its own process group; on timeout or interrupt the whole group is killed. A hook that exits successfully while a background child still holds its stdout open counts as finished two seconds later, so `start_agent` may leave a process running.
+
 Hooks that return a value. The value is the last non-empty line of stdout, trimmed, unless stated otherwise. A non-zero exit or a timeout is a failure.
 
 | Hook | Required | Called | Returns | Default timeout |
@@ -184,7 +188,7 @@ Hooks that return a value. The value is the last non-empty line of stdout, trimm
 | `stop_agent` | no | dispatch of a later session | nothing | 30s |
 | `last_report` | no | dispatch of a later session | all of stdout | 30s |
 
-Event hooks fire after a transition is saved: first `on_change`, then `on_<status>` for `queued`, `running`, `waiting`, `done` or `failed`. Their output is ignored and a failure is logged without affecting the run. Default timeout 30s.
+Event hooks fire after a transition is saved: first `on_change`, then `on_<status>` for `queued`, `running`, `waiting`, `done` or `failed`. `on_change` fires for every transition, including creation (`{previous}` is empty) and the move into `starting`; there is no `on_starting`. Their output is ignored and a failure is logged without affecting the run. They run to completion even when muster is interrupted, so a source plugin hears about the resulting `failed`. Default timeout 30s.
 
 ## Commands
 
@@ -205,7 +209,9 @@ Every command that prints runs accepts `-o table` (default) or `-o json`. A `RUN
 | `muster doctor` | Check the configuration, required hooks and state file, and report runs stuck in `starting`. Exits non-zero on a problem. |
 | `muster version` | Print the version. |
 
-JSON output for a run is its record. `start`, `follow`, `retry` and `done` print the affected run; `start -o json` adds `"created": true` or `false`. `tick -o json` prints a list of `{id, from, to}`.
+Errors go to stderr prefixed `muster:` and exit 1. An interrupt exits 130 after the current transition is saved; `muster watch` exits 0 on interrupt.
+
+JSON output for a run is its record. `start`, `follow`, `retry` and `done` print the affected run; `start -o json` adds `"created": true` or `false`. `tick -o json` prints a list of `{id, from, to}`; `from` is empty for a creation. `status -o json` prints a list of records, or one record with `RUN`. `rm -o json` prints the removed record.
 
 ## Plugins
 

@@ -121,7 +121,7 @@ func (e *Engine) fireEvent(ctx context.Context, name config.HookName, c change) 
 	}
 	vars := e.vars(c.run)
 	vars.Previous = string(c.transition.From)
-	e.runHook(ctx, name, c.run.ID, vars)
+	e.runHook(context.WithoutCancel(ctx), name, c.run.ID, vars)
 }
 
 func (e *Engine) runHook(ctx context.Context, name config.HookName, id string, vars hook.Vars) (string, error) {
