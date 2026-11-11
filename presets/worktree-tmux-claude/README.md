@@ -14,7 +14,7 @@ muster doctor
 Then edit `config.toml` in `MUSTER_DIR`:
 
 - `create_workspace` names the repository, `~/git/my-project`. Change it to yours. A second argument picks the base ref (default `HEAD` of that repository). Worktrees go to `MUSTER_DIR/worktrees/<id>`; remove one with `git worktree remove` when you are done with it.
-- Claude Code asks whether to trust a folder it has not seen. Until someone answers, the run shows `blocked`; attach with `tmux attach -t muster-<id>` to answer. Whether trusting `MUSTER_DIR/worktrees` once covers the worktrees below it has not been checked.
+- Claude Code asks whether to trust a folder it has not seen. Until someone answers, the run shows `blocked`; attach with `tmux attach -t muster-<id>` to answer. The prompt's default choice is "No, exit", so do not answer it with a bare Enter. Trusting `MUSTER_DIR/worktrees` once, by starting `claude` there, covers every worktree below it.
 
 ## How Claude Code reports its state
 
@@ -30,8 +30,9 @@ tmux has no command that reports the OSC 7501 program status Claude Code prints,
 
 ## Verified
 
-- Claude Code 2.1 does print OSC 7501 status (`app: claude-code`, `working` then `done`) when run under Rex, so the grove + Rex preset works with Claude Code too: replace `pi` in its `run-pi.sh`.
-- The `--settings` hooks above were run live with Claude Code 2.1 (in a Rex pane): `working` on the prompt, `done` when it answered, again for a second message, and the transcript gave the last answer.
-- `create-worktree.sh` was run against a scratch repository.
+With tmux 3 and Claude Code 2.1, in a temporary `MUSTER_DIR`:
 
-Not verified: the tmux commands (tmux was not installed where this preset was written; the scripts were only exercised against a fake `tmux`), the `blocked` state from a real permission prompt, and the trust prompt detection on a real tmux screen.
+- The trust prompt shows as `blocked`, and `muster send` refuses while it is on screen.
+- A real permission prompt shows as `blocked`; `muster send --force RUN 1` approves it and the run goes back to `running`, then `waiting` with `done`.
+- `muster send` to an idle agent, `muster follow` (the old tmux session is stopped and the new prompt carries the last report from the transcript), and `gone` after the tmux session is killed.
+- Claude Code also prints OSC 7501 status (`app: claude-code`) under Rex, so the grove + Rex preset works with Claude Code too: replace `pi` in its `run-pi.sh`.

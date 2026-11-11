@@ -19,6 +19,12 @@ $ muster follow fix-the "Also add a regression test"
 
 ## Install
 
+With Homebrew, once a release is published:
+
+```sh
+brew install --cask glundgren93/tap/muster
+```
+
 With Go 1.25 or later:
 
 ```sh

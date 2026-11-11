@@ -38,3 +38,4 @@ Checked live with pi 1.5 and Rex on macOS:
 - pi publishes no program status for about two seconds after launch (`unknown`, ignored), then `working` while it processes the prompt, then `done` when it has answered. It does not report `idle` at startup when started with a prompt, so `start_grace` only matters if pi is started without one.
 - A message is submitted with `rex send TEXT` followed by `rex send-key enter`. A trailing carriage return in `rex send` also submits; the two-step form keeps multi-line messages as one message.
 - After `rex kill`, every Rex call exits 3 with `... not found`, which `agent-status.sh` reports as `gone`.
+- `create-workspace.sh` was run against real `gw create` with a scratch grove setup: it created the workspace and printed its directory.

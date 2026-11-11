@@ -26,9 +26,9 @@ All four slices are done; the open items left are marked `[ ]` below and in "Ask
 | `internal/layout`, `config`, `state`, `hook`, `engine`, `plugin` | reviewed, fixed, tested |
 | `internal/cli`, `cmd/muster` | slice 1 commands: `start`, `status`, `tick`, `watch`, `done`, `retry`, `rm`, `doctor`, `version` |
 | Tests | unit tests per package plus an end-to-end test through the built binary |
-| Presets | `grove-rex-pi` (verified live), `worktree-tmux-claude` (tmux part unverified) |
+| Presets | `grove-rex-pi` and `worktree-tmux-claude`, both verified live |
 | Obsidian | `cmd/muster-obsidian`: `sync`, `watch`, `import-board` |
-| README, license, skill, release config | written; release never run |
+| README, license, skill, release config | written; snapshot release built and the cask installed locally; never published |
 
 ## Todo
 
@@ -51,7 +51,7 @@ Work through these in order. Each slice should end with the checks in "Definitio
 - [x] `presets/grove-rex-pi/`: `config.toml` plus hook scripts, using the Rex commands in "Rex contract".
 - [x] Verify the preset live with a real pi agent and a trivial prompt, using a temporary `MUSTER_DIR` and a temporary directory as the workspace (not `gw create`, which runs a slow setup hook). Record which states pi reports at startup and after finishing, and whether `start_grace` is needed. Recorded under "Rex contract".
 - [x] Confirm how to submit a message to pi's input through Rex: `rex send` with a trailing carriage return, or `rex send` followed by `rex send-key`. Both work; the preset uses `rex send -- TEXT` then `rex send-key enter`, which keeps a multi-line message as one.
-- [ ] Not verified live: `create-workspace.sh` against real `gw create` (checked only with a fake `gw`), the `blocked` state (pi was never seen blocked), and `notify.sh` actually showing a notification.
+- [x] `create-workspace.sh` ran against real `gw create`, with `HOME` pointed at a scratch directory so `~/.grove` was untouched: it created the workspace and printed its directory. `notify.sh` ran without error; whether the notification appeared on screen was not seen. pi was never seen `blocked`; the `blocked` state was verified with Claude Code instead (slice 4).
 
 ### 3. Slice 3: Obsidian source plugin
 
@@ -65,9 +65,9 @@ Work through these in order. Each slice should end with the checks in "Definitio
 ### 4. Slice 4: release
 
 - [x] Second preset: git worktree + tmux + Claude Code. Claude Code 2.1 does report OSC 7501 (`app: claude-code`), seen under Rex. tmux cannot report it, so the preset records state through Claude Code `--settings` hooks; those hooks were verified live. Codex is not installed here, so it was not checked.
-- [ ] Verify `presets/worktree-tmux-claude` with real tmux (not installed on the build machine; its scripts only ran against a fake `tmux`).
+- [x] Verify `presets/worktree-tmux-claude` with real tmux 3 and Claude Code 2.1: trust prompt reported as `blocked`, `send` refused while blocked, a real permission prompt reported as `blocked` and approved with `send --force`, `send`, `follow` (old session stopped, last report from the transcript), `gone` after killing the session. Trusting `MUSTER_DIR/worktrees` once covers new worktrees below it.
 - [x] README, an agent skill (`skills/muster/SKILL.md`), a license (MIT), goreleaser (`.goreleaser.yaml`, `.github/workflows/release.yml`) and a Homebrew tap entry in the goreleaser config. CI in `.github/workflows/ci.yml`.
-- [ ] goreleaser is not installed here, so `.goreleaser.yaml` was only checked as YAML, not with `goreleaser check` or a snapshot build. The tap repository `glundgren93/homebrew-tap` and the `HOMEBREW_TAP_GITHUB_TOKEN` secret do not exist yet.
+- [x] `goreleaser check` passes and `goreleaser release --snapshot` builds all four archives. goreleaser deprecated `brews`, so the config publishes a Homebrew cask. A quarantined unsigned binary hangs at launch under Gatekeeper, so the cask removes the quarantine attribute in `postflight`. The generated cask was installed from a throwaway local tap with `file://` URLs; both binaries ran. The tap repository `glundgren93/homebrew-tap` and the `HOMEBREW_TAP_GITHUB_TOKEN` secret do not exist yet.
 - [x] `muster init [PRESET]` with presets embedded in the binary (`presets/presets.go`).
 
 ## Settled design questions
