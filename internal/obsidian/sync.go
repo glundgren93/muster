@@ -120,10 +120,13 @@ func (s Syncer) syncNote(path string, byID, bySource map[string]Run, result *Res
 		return err
 	}
 	note := ParseNote(string(original))
-	status, isTask := note.Get(StatusKey)
+	written, isTask := note.Get(StatusKey)
 	if !isTask {
 		return nil
 	}
+	status := strings.ToLower(strings.TrimSpace(written))
+	followUp, _ := note.Get(FollowUpKey)
+	followUp = strings.TrimSpace(followUp)
 	source := SourcePrefix + s.relative(path)
 	run, linked := s.linkedRun(note, source, byID, bySource)
 
@@ -131,22 +134,22 @@ func (s Syncer) syncNote(path string, byID, bySource map[string]Run, result *Res
 	holdNow := false
 	switch {
 	case status == StatusNow && !linked:
-		run, actionErr = s.Muster.Start(s.startRequest(path, note, source))
+		run, actionErr = s.Muster.Start(s.startRequest(path, note, source, followUp))
 		if run.ID != "" {
 			linked = true
+			note.Delete(FollowUpKey)
 			result.Started++
 			s.logf("started %s from %s", run.ID, s.relative(path))
 		}
 	case status == StatusNow:
-		followUp, _ := note.Get(FollowUpKey)
 		switch {
-		case strings.TrimSpace(followUp) != "" && run.Sessions > 0 && slices.Contains([]string{"waiting", "done", "failed", "queued"}, run.Status):
-			if run, actionErr = s.Muster.Follow(run.ID, strings.TrimSpace(followUp)); actionErr == nil {
+		case followUp != "" && run.Sessions > 0 && slices.Contains([]string{"waiting", "done", "failed", "queued"}, run.Status):
+			if run, actionErr = s.Muster.Follow(run.ID, followUp); actionErr == nil {
 				note.Delete(FollowUpKey)
 				result.FollowedUp++
 				s.logf("followed up %s", run.ID)
 			}
-		case strings.TrimSpace(followUp) != "":
+		case followUp != "":
 			holdNow = true
 		case run.Status == "failed":
 			if run, actionErr = s.Muster.Retry(run.ID); actionErr == nil {
@@ -186,11 +189,14 @@ func (s Syncer) linkedRun(note Note, source string, byID, bySource map[string]Ru
 	return run, found
 }
 
-func (s Syncer) startRequest(path string, note Note, source string) StartRequest {
+func (s Syncer) startRequest(path string, note Note, source, followUp string) StartRequest {
 	title := strings.TrimSuffix(filepath.Base(path), ".md")
 	prompt := title
 	if body := strings.TrimSpace(note.Body()); body != "" {
 		prompt = title + "\n\n" + body
+	}
+	if followUp != "" {
+		prompt += "\n\nFollow-up:\n" + followUp
 	}
 	model, _ := note.Get(ModelKey)
 	workspace, _ := note.Get(WorkspaceKey)

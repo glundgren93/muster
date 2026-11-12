@@ -60,7 +60,7 @@ Work through these in order. Each slice should end with the checks in "Definitio
 - [x] Test on fixture notes only. Unit tests on fixtures plus an end-to-end test through both binaries; also driven by hand against a live pi agent with notes in a temporary folder.
 - [ ] Try the Obsidian Bases Kanban view (native since Obsidian 1.14) on a copy of real notes: group by `status`, drag a card, confirm the frontmatter changes. Not done: it needs the Obsidian app driven by hand, which this session could not do. `docs/obsidian.md` has a `.base` file to try; the view type `kanban` and the `groupBy: {property, direction}` keys were read from Obsidian 1.15's bundled code.
 - [x] Write a one-time converter from the owner's current Kanban board file to task notes: `muster obsidian import-board`. Tested on a fixture board only. Run it only with the owner's approval.
-- [ ] The owner's board (`~/Documents/Obsidian Vault/Agent board.md`) and the old dispatcher do not exist on the machine slices 1 to 4 were built on (its only vault is `~/Documents/vault/vault`, with no board), so the converter has not seen the real board. Check its output on a copy before moving notes into the vault.
+- [x] The converter was run on a copy of the owner's real board (67 cards). That showed dispatcher status lines ending up in prompts, Review cards losing their workspace and linked cards keeping a self-link; all three are fixed, see `docs/obsidian.md`.
 
 ### 4. Slice 4: release
 
@@ -136,7 +136,7 @@ States come from the OSC 7501 program status protocol: `idle`, `working`, `done`
 
 Observed in slice 2 with pi 1.5 started with a prompt argument: `records` is empty for about two seconds after launch (mapped to `unknown`, which muster ignores), then `working`, then `done` once pi has answered; `done` persists until the next message, which goes back to `working`. pi never reported `idle` in these runs, so `start_grace` is a safeguard rather than a need for this preset. `rex send TEXT` with a trailing `\r` submits, and so does `rex send TEXT` followed by `rex send-key enter`; `rex send -- TEXT` accepts text starting with `-`. `rex kill` of an already killed session exits 3 with `not found`.
 
-Rex runs commands through the login shell but not interactive startup files unless `--interactive` is passed. The owner starts pi through a zsh function `pia` defined in `~/.zshrc`, so the owner's personal start command needs `--interactive` or an explicit `zsh -ic`; `presets/grove-rex-pi/README.md` shows the edit to `run-pi.sh`. (`pia` is not defined on the machine slices 1 to 4 were built on, so the preset starts plain `pi`.)
+Rex runs commands through the login shell but not interactive startup files unless `--interactive` is passed. The owner starts pi through a zsh function `pia` defined in `~/.zshrc`; plain `pi` has no model credentials on the owner's machine. The preset's `start_agent` takes the agent command as its argument, and `run-pi.sh` runs a name that is not on `PATH` through `$SHELL -ic`, so the owner's setup is `start-agent.sh pia`. Verified live with pi 1.5 under Rex.
 
 ## The system muster replaces
 
@@ -161,8 +161,8 @@ The dispatcher still calls herdr and has failed on every run since the owner mov
 Prepared and waiting for the owner:
 
 1. Install the binaries: `go install ./cmd/muster ./cmd/muster-obsidian` from the repository.
-2. Set up `~/.muster`: `muster init grove-rex-pi`, then edit the grove preset name in `~/.muster/config.toml` and, for `pia`, `~/.muster/hooks/run-pi.sh`.
-3. Convert the board into a new folder and review it before moving anything: `muster obsidian import-board "<vault>/Agent board.md" --out "<vault>/Tasks-muster" --vault "<vault>"`.
+2. Set up `~/.muster`: `muster init grove-rex-pi`, then in `~/.muster/config.toml` change the grove preset name `backend` to `funnel-ai` and the agent command `pi` to `pia`.
+3. Convert the board into a new folder and review it before moving anything: `muster obsidian import-board "<vault>/Agent board.md" --out "<vault>/Tasks-muster" --vault "<vault>" --workspaces ~/.grove/workspaces`.
 4. Replace the launchd job: unload the old one if it exists (`launchctl unload ~/Library/LaunchAgents/com.gabriel.todo-dispatch.plist`), write the plist from `docs/obsidian.md`, and `launchctl load` it.
 5. Try the Bases Kanban view with the `.base` file in `docs/obsidian.md`.
 6. Before going public: delete this file, then `gh repo edit glundgren93/muster --visibility public --accept-visibility-change-consequences`.

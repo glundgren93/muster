@@ -64,6 +64,7 @@ func newStartCommand() *cobra.Command {
 	flags.StringVar(&request.Workspace, "workspace", "", "existing `DIR` to work in (skips create_workspace)")
 	flags.BoolVar(&request.Queue, "queue", false, "create the run only; leave dispatch to a later pass")
 	addOutputFlag(command, &output)
+	markTakesText(command)
 	return command
 }
 
@@ -402,6 +403,7 @@ func newSendCommand() *cobra.Command {
 		},
 	}
 	command.Flags().BoolVar(&force, "force", false, "send even when the agent is blocked")
+	markTakesText(command)
 	return command
 }
 
@@ -426,5 +428,6 @@ func newFollowCommand() *cobra.Command {
 	}
 	command.Flags().BoolVar(&queue, "queue", false, "queue the run only; leave dispatch to a later pass")
 	addOutputFlag(command, &output)
+	markTakesText(command)
 	return command
 }

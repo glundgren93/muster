@@ -197,7 +197,7 @@ Every command that prints runs accepts `-o table` (default) or `-o json`. A `RUN
 | Command | Behaviour |
 |---|---|
 | `muster start [TEXT]` | Create a run and dispatch. Flags: `-f FILE` reads the prompt from a file (`-` for stdin), `--title`, `--id`, `--source`, `--model`, `--workspace DIR` (an existing directory, skips `create_workspace`), `--queue` (create only, leave dispatch to a later pass). If a run with the same `--source` exists, print it and change nothing. |
-| `muster status [RUN]` | Reconcile, then list runs that are not `done`, ordered `waiting`, `failed`, `running`, `starting`, `queued`. `--all` includes `done`. `--cached` skips the reconcile. With `RUN`, show that run in full. |
+| `muster status [RUN]` | Reconcile, then list runs that are not `done`, ordered `waiting`, `failed`, `running`, `starting`, `queued`. `--all` includes `done`. `--cached` skips the reconcile. With `RUN`, show that run in full. A `waiting` run whose agent is `idle` and never reported `working` is shown as `idle, never worked`: the agent did not take up its prompt. |
 | `muster tick` | One reconcile and dispatch pass. Prints each transition. |
 | `muster watch` | Run passes every `interval` until interrupted. `--interval` overrides the setting. |
 | `muster read RUN` | Print the agent's recent output through `read_agent`. `--lines N`, default 80. |
@@ -211,6 +211,8 @@ Every command that prints runs accepts `-o table` (default) or `-o json`. A `RUN
 | `muster version` | Print the version. |
 
 Errors go to stderr prefixed `muster:` and exit 1. An interrupt exits 130 after the current transition is saved; `muster watch` exits 0 on interrupt.
+
+The text argument of `start`, `send` and `follow` may start with `-` when whitespace follows the dashes, as in a Markdown bullet; such an argument is never read as a flag unless it is the value of the flag before it. Other text that starts with `-` goes after `--`.
 
 JSON output for a run is its record. `start`, `follow`, `retry` and `done` print the affected run; `start -o json` adds `"created": true` or `false`. `tick -o json` prints a list of `{id, from, to}`; `from` is empty for a creation. `status -o json` prints a list of records, or one record with `RUN`. `rm -o json` prints the removed record.
 

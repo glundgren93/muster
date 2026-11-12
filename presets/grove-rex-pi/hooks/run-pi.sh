@@ -1,6 +1,9 @@
 #!/bin/sh
 prompt=$(cat "$1")
-if [ -n "${2:-}" ]; then
-	exec pi --model "$2" "$prompt"
+shift
+set -- "$@" "$prompt"
+
+if command -v "$1" >/dev/null 2>&1; then
+	exec "$@"
 fi
-exec pi "$prompt"
+exec "${SHELL:-/bin/sh}" -ic '"$@"' "$1" "$@"

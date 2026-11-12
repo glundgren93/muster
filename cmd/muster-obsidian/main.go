@@ -151,7 +151,13 @@ written to a new folder. The board itself is only read.
 Each note gets status from its lane: the lane name in lower case with other characters
 turned into -, done for a checked card. Cards in a lane called Now get status ready unless
 --keep-now is given, so the first sync does not start them all. A card that is only a
-[[link]] to a note in --vault gets that note's text as its body.`,
+[[link]] to a note in --vault gets that note's text as its body, and the linked notes are
+listed so they can be deleted once the new notes have been checked.
+
+Status lines left on cards by the todo-dispatch script ("- 🤖 idle, check · opus · NAME")
+are dropped, and next: and sent: prefixes on those cards are removed. With --workspaces,
+a card whose status line names a directory in that folder gets it as its workspace, so a
+later run continues where the earlier agent worked.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if options.Out == "" {
@@ -168,20 +174,36 @@ turned into -, done for a checked card. Cards in a lane called Now get status re
 			if err != nil {
 				return err
 			}
+			if options.Workspaces != "" {
+				if options.Workspaces, err = filepath.Abs(options.Workspaces); err != nil {
+					return err
+				}
+			}
 			converted, err := obsidian.ConvertBoard(cards, options)
 			counts := map[string]int{}
+			var replaced []string
 			for _, note := range converted {
 				counts[note.Status]++
+				if note.Replaces != "" {
+					replaced = append(replaced, note.Replaces)
+				}
 			}
 			for _, status := range slices.Sorted(maps.Keys(counts)) {
 				fmt.Fprintf(cmd.OutOrStdout(), "%-12s %d\n", status, counts[status])
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "wrote %d note(s) to %s\n", len(converted), options.Out)
+			if len(replaced) > 0 {
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%d of them copy a linked note and share its name; delete these originals once the new notes look right:\n", len(replaced))
+				for _, path := range replaced {
+					fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", path)
+				}
+			}
 			return err
 		},
 	}
 	command.Flags().StringVar(&options.Out, "out", "", "new folder for the task notes")
 	command.Flags().StringVar(&options.Vault, "vault", "", "vault folder used to resolve [[links]] in cards")
+	command.Flags().StringVar(&options.Workspaces, "workspaces", "", "folder of workspaces named on cards by the todo-dispatch script")
 	command.Flags().BoolVar(&options.KeepNow, "keep-now", false, "keep status now for cards in the Now lane")
 	return command
 }

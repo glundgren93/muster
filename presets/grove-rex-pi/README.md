@@ -14,19 +14,19 @@ muster doctor
 Then edit `~/.muster/config.toml`:
 
 - `create_workspace` passes `backend` as the grove preset. Change it to one of yours (`gw preset list`), or remove the hook to work in `~/.muster/workspaces/<id>`. `muster start --workspace DIR` skips it for one run.
-- `hooks/run-pi.sh` starts `pi`. Rex runs it through your login shell without interactive startup files, so a shell function from `~/.zshrc` is not available there. To use one, replace the `exec pi ...` lines with something like `exec zsh -ic 'pia "$@"' pia "$prompt"`.
+- `start_agent` passes `pi` as the command that starts the agent. Change it to your own, for example `start-agent.sh aws-vault exec work -- pi`. A name that is not an executable on `PATH`, such as a function from `~/.zshrc`, is run through your interactive shell (`$SHELL -ic`).
 
 ## How it maps
 
 | Hook | Script | Rex or pi call |
 |---|---|---|
 | `create_workspace` | `create-workspace.sh PRESET` | `gw create ID -b ID -p PRESET`, directory read from `GROVE_CD_FILE` |
-| `start_agent` | `start-agent.sh` | `rex new muster-ID -c WORKSPACE --json -- run-pi.sh PROMPT_FILE [MODEL]`; the handle is `SESSION BLOCK` |
+| `start_agent` | `start-agent.sh` | `rex new muster-ID -c WORKSPACE --json -- run-pi.sh PROMPT_FILE COMMAND... [--model MODEL]`; the handle is `SESSION BLOCK` |
 | `agent_status` | `agent-status.sh` | `rex block call program_status`; the root record's state, `unknown` when there is none yet, `gone` when Rex reports not found |
 | `read_agent` | `read-agent.sh` | `rex capture --trim`, last `N` lines |
 | `send_agent` | `send-agent.sh` | `rex send -- TEXT`, then `rex send-key enter` |
 | `stop_agent` | `stop-agent.sh` | `rex kill SESSION`; an already gone session is fine |
-| `last_report` | `last-report.sh` | the last assistant text in pi's newest session file for the workspace, else the last 40 lines of the pane |
+| `last_report` | `last-report.sh` | the last assistant text in pi's newest session file for the workspace (symlinks in its path resolved), else the last 40 lines of the pane |
 | `on_waiting` | `notify.sh` | a macOS notification |
 
 Rex does not show a new session in the app on its own; open it from the session list (`rex ls`).

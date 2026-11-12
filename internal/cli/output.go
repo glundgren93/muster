@@ -68,7 +68,7 @@ func writeRunTable(w io.Writer, runs []state.Run, now time.Time) error {
 	table := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(table, "ID\tSTATUS\tAGENT\tUPDATED\tTITLE")
 	for _, run := range runs {
-		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\n", run.ID, run.Status, orDash(string(run.AgentState)), age(run.UpdatedAt, now), run.Title)
+		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\n", run.ID, run.Status, orDash(agentSummary(run)), age(run.UpdatedAt, now), run.Title)
 	}
 	return table.Flush()
 }
@@ -89,7 +89,7 @@ func writeRun(w io.Writer, run state.Run, now time.Time) error {
 	field("title", run.Title)
 	field("status", string(run.Status))
 	if run.AgentState != "" {
-		field("agent state", fmt.Sprintf("%s (seen %s ago)", run.AgentState, age(run.AgentStateAt, now)))
+		field("agent state", fmt.Sprintf("%s (seen %s ago)", agentSummary(run), age(run.AgentStateAt, now)))
 	}
 	field("error", run.Error)
 	field("source", run.Source)
@@ -117,6 +117,13 @@ func writeRun(w io.Writer, run state.Run, now time.Time) error {
 	}
 	_, err := fmt.Fprintf(w, "\nprompt:\n%s\n", indent(strings.TrimRight(run.Prompt, "\n"), "  "))
 	return err
+}
+
+func agentSummary(run state.Run) string {
+	if run.Status == state.Waiting && run.AgentState == state.AgentIdle && !run.SeenWorking {
+		return string(run.AgentState) + ", never worked"
+	}
+	return string(run.AgentState)
 }
 
 func writeTransitions(w io.Writer, transitions []engine.Transition) error {

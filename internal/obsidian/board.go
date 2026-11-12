@@ -20,6 +20,9 @@ var (
 	wikiLink  = regexp.MustCompile(`\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]`)
 	wholeLink = regexp.MustCompile(`^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]+)?\]\]$`)
 	nonSlug   = regexp.MustCompile(`[^a-z0-9]+`)
+
+	dispatcherStatus   = regexp.MustCompile(`^\s*- 🤖 (?:running|idle, check) · (?:[a-z]+ · )?([A-Za-z0-9][A-Za-z0-9._-]*)\s*$`)
+	dispatcherFollowUp = regexp.MustCompile(`^(\s*- )(?:next|sent): ?`)
 )
 
 func ParseBoard(content string) ([]Card, error) {
@@ -83,15 +86,36 @@ func (c Card) LinkedNote() string {
 	return ""
 }
 
+func (c Card) withoutDispatcherLines() (text, workspaceName string) {
+	lines := strings.Split(c.Text, "\n")
+	kept := lines[:1:1]
+	for _, line := range lines[1:] {
+		if match := dispatcherStatus.FindStringSubmatch(line); match != nil {
+			workspaceName = match[1]
+			continue
+		}
+		kept = append(kept, line)
+	}
+	if workspaceName == "" {
+		return c.Text, ""
+	}
+	for i, line := range kept {
+		kept[i] = dispatcherFollowUp.ReplaceAllString(line, "$1")
+	}
+	return strings.Join(kept, "\n"), workspaceName
+}
+
 type ConvertOptions struct {
-	Out     string
-	Vault   string
-	KeepNow bool
+	Out        string
+	Vault      string
+	Workspaces string
+	KeepNow    bool
 }
 
 type Converted struct {
-	Path   string
-	Status string
+	Path     string
+	Status   string
+	Replaces string
 }
 
 func LaneStatus(lane string, complete, keepNow bool) string {
@@ -126,9 +150,14 @@ func ConvertBoard(cards []Card, options ConvertOptions) ([]Converted, error) {
 		used[strings.ToLower(name)] = true
 
 		status := LaneStatus(card.Lane, card.Complete, options.KeepNow)
-		note := Note{newline: "\n", body: noteBody(card, options.Vault)}
+		text, workspaceName := card.withoutDispatcherLines()
+		body, replaces := noteBody(text, card.LinkedNote(), options.Vault)
+		note := Note{newline: "\n", body: body}
 		note.Set(StatusKey, status)
 		note.Set("lane", card.Lane)
+		if workspace := existingWorkspace(options.Workspaces, workspaceName); workspace != "" {
+			note.Set(WorkspaceKey, workspace)
+		}
 
 		path := filepath.Join(options.Out, name+".md")
 		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
@@ -139,31 +168,42 @@ func ConvertBoard(cards []Card, options ConvertOptions) ([]Converted, error) {
 		if err := errors.Join(writeErr, file.Close()); err != nil {
 			return converted, err
 		}
-		converted = append(converted, Converted{Path: path, Status: status})
+		converted = append(converted, Converted{Path: path, Status: status, Replaces: replaces})
 	}
 	return converted, nil
 }
 
-func noteBody(card Card, vault string) string {
-	text := strings.TrimSpace(card.Text)
-	if link := card.LinkedNote(); link != "" && vault != "" {
-		if linked, err := readLinkedNote(vault, link); err == nil {
-			body := strings.TrimSpace(ParseNote(linked).Body())
-			if body != "" {
-				return "\n" + text + "\n\n" + body + "\n"
+func noteBody(text, link, vault string) (body, replaces string) {
+	text = strings.TrimSpace(text)
+	if link != "" && vault != "" {
+		if path, linked, err := readLinkedNote(vault, link); err == nil {
+			if linkedBody := strings.TrimSpace(ParseNote(linked).Body()); linkedBody != "" {
+				_, details, _ := strings.Cut(text, "\n")
+				return "\n" + strings.TrimSpace(linkedBody+"\n\n"+strings.TrimSpace(details)) + "\n", path
 			}
 		}
 	}
-	return "\n" + text + "\n"
+	return "\n" + text + "\n", ""
 }
 
-func readLinkedNote(vault, link string) (string, error) {
+func existingWorkspace(root, name string) string {
+	if root == "" || name == "" {
+		return ""
+	}
+	path := filepath.Join(root, name)
+	if info, err := os.Stat(path); err != nil || !info.IsDir() {
+		return ""
+	}
+	return path
+}
+
+func readLinkedNote(vault, link string) (path, content string, err error) {
 	candidate := filepath.Join(vault, filepath.FromSlash(link))
 	if !strings.HasSuffix(candidate, ".md") {
 		candidate += ".md"
 	}
 	if data, err := os.ReadFile(candidate); err == nil {
-		return string(data), nil
+		return candidate, string(data), nil
 	}
 	var found string
 	base := filepath.Base(candidate)
@@ -181,8 +221,8 @@ func readLinkedNote(vault, link string) (string, error) {
 		return nil
 	})
 	if found == "" {
-		return "", os.ErrNotExist
+		return "", "", os.ErrNotExist
 	}
 	data, err := os.ReadFile(found)
-	return string(data), err
+	return found, string(data), err
 }

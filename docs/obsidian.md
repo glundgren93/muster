@@ -18,7 +18,7 @@ Find out why and fix it.
 
 | Property | Set by | Meaning |
 |---|---|---|
-| `status` | you, then muster | `now` asks for work, `done` closes the run; muster writes the run's status back |
+| `status` | you, then muster | `now` asks for work, `done` closes the run, in any letter case; muster writes the run's status back |
 | `run` | muster | the id of the note's run |
 | `follow_up` | you | text for the next agent session, sent when `status` is `now` |
 | `model` | you, optional | passed as `muster start --model` |
@@ -34,7 +34,7 @@ For each task note:
 
 | Note | Run | Action |
 |---|---|---|
-| `status: now` | none | `muster start`; the note gets `run` and the run's status |
+| `status: now` | none | `muster start`; the note gets `run` and the run's status. A `follow_up` is added to the end of the prompt and removed |
 | `status: now` with `follow_up` | `waiting`, `done`, `failed` or `queued` | `muster follow` with the text; `follow_up` is removed |
 | `status: now` with `follow_up` | `running` or `starting` | nothing yet; the note keeps `now` until the run stops |
 | `status: now` | `failed` | `muster retry` |
@@ -55,7 +55,9 @@ muster obsidian import-board ~/Vault/Board.md --out ~/Vault/Tasks-new --vault ~/
 
 `--dir` defaults to `$MUSTER_OBSIDIAN_DIR`. `watch` replaces `muster watch`; run one or the other.
 
-`import-board` converts a board from the Kanban community plugin into task notes in a new, empty folder, and never changes the board. A card's lane becomes its `status` (lower case, other characters turned into `-`), a checked card becomes `done`, and the archive is skipped. Cards in a lane called Now become `ready`, so the first sync does not start them all; pass `--keep-now` to keep `now`. The original lane is kept in a `lane` property. A card that is only a `[[link]]` gets the linked note's body below the link, looked up in `--vault`.
+`import-board` converts a board from the Kanban community plugin into task notes in a new, empty folder, and never changes the board. A card's lane becomes its `status` (lower case, other characters turned into `-`), a checked card becomes `done`, and the archive is skipped. Cards in a lane called Now become `ready`, so the first sync does not start them all; pass `--keep-now` to keep `now`. The original lane is kept in a `lane` property. A card that is only a `[[link]]` gets the linked note's body, looked up in `--vault`, followed by the card's other lines. The new note has the same name as the linked one, so the command lists the linked notes; delete them once the new notes look right.
+
+Cards that were handled by the `todo-dispatch` script carry a status line such as `- 🤖 idle, check · opus · NAME`. These lines are left out, and the `next:` and `sent:` prefixes on those cards are removed so the text stays. With `--workspaces DIR`, a card whose status line names an existing directory `DIR/NAME` gets `workspace: DIR/NAME`, so setting the note to `now` starts an agent where the earlier one worked. Add a `follow_up` first to tell it what is left to do.
 
 ## A board in Obsidian
 

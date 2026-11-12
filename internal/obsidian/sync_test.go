@@ -205,3 +205,32 @@ func TestNoteEditedDuringSyncIsNotOverwritten(t *testing.T) {
 		t.Fatalf("note %q", got)
 	}
 }
+
+func TestFollowUpOnANoteWithoutARunJoinsTheFirstPrompt(t *testing.T) {
+	dir := t.TempDir()
+	path := writeNote(t, dir, "Imported.md", "---\nstatus: now\nworkspace: /work/earlier\nfollow_up: Also cover logout\n---\nRefactor auth.\n")
+	muster := newFakeMuster()
+
+	result := sync(t, dir, muster)
+	if result.Started != 1 || len(result.Errors) != 0 {
+		t.Fatalf("result %+v", result)
+	}
+	if want := `start obsidian:Imported.md "Imported\n\nRefactor auth.\n\nFollow-up:\nAlso cover logout\n" Imported model= workspace=/work/earlier`; strings.Join(muster.calls, "\n") != want {
+		t.Fatalf("calls:\n%s\nwant:\n%s", strings.Join(muster.calls, "\n"), want)
+	}
+	if got := readNote(t, path); got != "---\nstatus: running\nworkspace: /work/earlier\nrun: run-1\n---\nRefactor auth.\n" {
+		t.Fatalf("note:\n%s", got)
+	}
+}
+
+func TestStatusIsReadWhateverItsCase(t *testing.T) {
+	dir := t.TempDir()
+	writeNote(t, dir, "Start me.md", "---\nstatus: Now\n---\n")
+	writeNote(t, dir, "Close me.md", "---\nstatus: DONE\nrun: run-9\n---\n")
+	muster := newFakeMuster(Run{ID: "run-9", Status: "waiting", Sessions: 1})
+
+	result := sync(t, dir, muster)
+	if result.Started != 1 || result.Closed != 1 || len(result.Errors) != 0 {
+		t.Fatalf("result %+v, calls %v", result, muster.calls)
+	}
+}

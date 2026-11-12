@@ -32,7 +32,7 @@ func Main(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	context.AfterFunc(ctx, stop)
-	root.SetArgs(args)
+	root.SetArgs(textLast(root, args))
 	if err := root.ExecuteContext(ctx); err != nil {
 		if errors.Is(err, context.Canceled) {
 			fmt.Fprintln(os.Stderr, "muster: interrupted")
@@ -69,6 +69,7 @@ func newRootCommand() *cobra.Command {
 		newDoctorCommand(),
 		newVersionCommand(),
 	)
+	root.SetFlagErrorFunc(hintAtDoubleDash)
 	return root
 }
 
@@ -78,12 +79,16 @@ func isPluginName(root *cobra.Command, name string) bool {
 	if name == "" || name[0] == '-' || name == "help" {
 		return false
 	}
+	return builtinCommand(root, name) == nil
+}
+
+func builtinCommand(root *cobra.Command, name string) *cobra.Command {
 	for _, command := range root.Commands() {
 		if command.Name() == name || slices.Contains(command.Aliases, name) {
-			return false
+			return command
 		}
 	}
-	return true
+	return nil
 }
 
 func runPlugin(name string, args []string) error {

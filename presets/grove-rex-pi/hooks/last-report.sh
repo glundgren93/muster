@@ -1,7 +1,8 @@
 #!/bin/sh
 set -u
 
-sessions="$HOME/.pi/agent/sessions/--$(printf '%s' "$MUSTER_WORKSPACE" | sed 's|^/||; s|/|-|g')--"
+workspace=$(cd "$MUSTER_WORKSPACE" 2>/dev/null && pwd -P) || workspace=$MUSTER_WORKSPACE
+sessions="$HOME/.pi/agent/sessions/--$(printf '%s' "$workspace" | sed 's|^/||; s|/|-|g')--"
 latest=$(ls -t "$sessions"/*.jsonl 2>/dev/null | head -n 1)
 if [ -n "$latest" ]; then
 	report=$(jq -rs '[.[] | select(.type == "message" and .message.role == "assistant") | .message.content[]? | select(.type == "text") | .text] | last // empty' "$latest")

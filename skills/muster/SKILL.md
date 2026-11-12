@@ -25,6 +25,8 @@ muster read RUN --lines 80       # the agent's recent screen output
 | `failed` | muster could not start the agent; `error` says why | fix the cause, then `retry` |
 | `done` | closed by a human | nothing |
 
+`agent_state: idle` with `seen_working: false` on a `waiting` run means the agent never started on its prompt, usually because it failed to launch or log in. Read its screen before following up.
+
 `agent_state: blocked` means the agent is waiting on a question or a permission prompt. Read its screen and tell the user what it is asking; do not answer for them unless they told you to.
 
 ## Act
@@ -42,6 +44,7 @@ muster retry RUN                                  # requeue a failed run
 - Use `send` for a short answer to a live agent. It refuses when the agent is `blocked`; pass `--force` only when the user wants that prompt answered with your text.
 - Use `follow` when the run is `waiting` or `done` and needs more work. The new session gets the original prompt, earlier follow-ups and the previous agent's last answer.
 - `done` does not stop the agent or delete the workspace; it only closes the run.
+- Text that starts with `- ` (a bullet) is accepted as is. Put any other text that starts with `-` after `--`: `muster send RUN -- "-v is the flag to use"`.
 - Add `-o json` to any of these to get the run record back.
 
 ## When something is wrong

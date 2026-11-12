@@ -4,7 +4,7 @@ start_grace = "60s"
 default_model = ""
 
 [hooks]
-start_agent = '"$MUSTER_DIR/hooks/start-agent.sh"'
+start_agent = '"$MUSTER_DIR/hooks/start-agent.sh" pi'
 agent_status = '"$MUSTER_DIR/hooks/agent-status.sh"'
 read_agent = '"$MUSTER_DIR/hooks/read-agent.sh"'
 send_agent = '"$MUSTER_DIR/hooks/send-agent.sh"'
