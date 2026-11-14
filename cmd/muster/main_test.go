@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 var binary string
@@ -161,5 +163,57 @@ func TestInitCopiesAPresetWithoutOverwriting(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(filepath.Join(c.dir, "config.toml")); string(data) != "max_running = 1\n" {
 		t.Fatal("init overwrote an edited config")
+	}
+}
+
+func TestWaitExitCodes(t *testing.T) {
+	c := shell{t: t, dir: t.TempDir()}
+	c.write("config.toml", `
+interval = "20ms"
+[hooks]
+start_agent = "echo pane-{id}"
+agent_status = "cat \"$MUSTER_DIR/agent-state\""
+`, 0o644)
+	c.write("agent-state", "working\n", 0o644)
+	c.must("start", "--id", "task", "Write the release notes")
+
+	exit := func(err error) int {
+		t.Helper()
+		var exited *exec.ExitError
+		if err == nil {
+			return 0
+		}
+		if !errors.As(err, &exited) {
+			t.Fatal(err)
+		}
+		return exited.ExitCode()
+	}
+	stdout, stderr, err := c.run("wait", "task", "--timeout", "100ms")
+	if exit(err) != 4 || !strings.Contains(stdout, "running") || !strings.Contains(stderr, "timed out") {
+		t.Fatalf("timeout: exit %d\n%s%s", exit(err), stdout, stderr)
+	}
+
+	for _, step := range []struct {
+		agent string
+		want  int
+	}{{"blocked", 3}, {"error", 2}, {"done", 0}} {
+		c.write("agent-state", "working\n", 0o644)
+		c.must("tick")
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			c.write("agent-state", step.agent+"\n", 0o644)
+		}()
+		stdout, stderr, err := c.run("wait", "task", "-o", "json", "--timeout", "30s")
+		var runs []map[string]any
+		if jsonErr := json.Unmarshal([]byte(stdout), &runs); jsonErr != nil {
+			t.Fatalf("%s: %v\n%s%s", step.agent, jsonErr, stdout, stderr)
+		}
+		if exit(err) != step.want || len(runs) != 1 || runs[0]["status"] != "waiting" || runs[0]["agent_state"] != step.agent {
+			t.Fatalf("%s: exit %d, want %d\n%s%s", step.agent, exit(err), step.want, stdout, stderr)
+		}
+	}
+
+	if _, stderr, err := c.run("wait", "nope"); exit(err) != 1 || !strings.Contains(stderr, "no run matches") {
+		t.Fatalf("unknown run: exit %d %s", exit(err), stderr)
 	}
 }

@@ -34,6 +34,13 @@ func Main(args []string) int {
 	context.AfterFunc(ctx, stop)
 	root.SetArgs(textLast(root, args))
 	if err := root.ExecuteContext(ctx); err != nil {
+		var coded *exitError
+		if errors.As(err, &coded) {
+			if coded.message != "" {
+				fmt.Fprintf(os.Stderr, "muster: %s\n", coded.message)
+			}
+			return coded.code
+		}
 		if errors.Is(err, context.Canceled) {
 			fmt.Fprintln(os.Stderr, "muster: interrupted")
 			return 130
@@ -59,6 +66,7 @@ func newRootCommand() *cobra.Command {
 		newStatusCommand(),
 		newTickCommand(),
 		newWatchCommand(),
+		newWaitCommand(),
 		newReadCommand(),
 		newSendCommand(),
 		newFollowCommand(),
@@ -72,6 +80,14 @@ func newRootCommand() *cobra.Command {
 	root.SetFlagErrorFunc(hintAtDoubleDash)
 	return root
 }
+
+// exitError ends the command with a specific exit code after its output is written.
+type exitError struct {
+	code    int
+	message string
+}
+
+func (e *exitError) Error() string { return e.message }
 
 var errNoPlugin = errors.New("no plugin found")
 

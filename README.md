@@ -61,6 +61,7 @@ muster status RUN                # one run in full
 muster read RUN                  # the agent's recent output
 muster send RUN "yes, go ahead"  # type into the live agent
 muster follow RUN "now add tests"  # a new agent session in the same workspace, with context
+muster wait RUN                  # block until the run needs someone; the exit code says why
 muster done RUN                  # close the run
 muster retry RUN                 # requeue a run whose agent failed to start
 muster rm RUN                    # forget a run
@@ -70,6 +71,8 @@ muster watch                     # keep checking agents and starting queued runs
 `RUN` is a run id or a unique prefix of one. Every command that prints runs takes `-o json`.
 
 At most `max_running` agents run at once; the rest wait in the queue. `muster watch`, or `muster tick` from a scheduler, checks each agent's state and starts queued runs as slots free up. A run moves to `waiting` when its agent stops working, and an `on_waiting` hook can notify you.
+
+`muster wait RUN...` blocks until the runs are `waiting`, `done` or `failed` (`--any` for the first of several, `--timeout` to give up). It exits 0 when the agents finished, 3 when one is blocked on a question, 2 when one failed and 4 on a timeout. An agent that started a run can leave `muster wait` in a background command and is told when the run needs it.
 
 ## Hooks
 

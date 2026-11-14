@@ -47,6 +47,21 @@ muster retry RUN                                  # requeue a failed run
 - Text that starts with `- ` (a bullet) is accepted as is. Put any other text that starts with `-` after `--`: `muster send RUN -- "-v is the flag to use"`.
 - Add `-o json` to any of these to get the run record back.
 
+## Hear when a run finishes
+
+`muster wait RUN...` blocks until each run is `waiting`, `done` or `failed`, then prints the runs. After you start a run for a task you need the result of, run `muster wait RUN -o json` as a background command (in Claude Code, `run_in_background`). You are called again when it exits; do not poll `muster status` in a loop.
+
+| exit | meaning | next |
+|---|---|---|
+| 0 | the agent finished | `muster read RUN`, then `done` or `follow` |
+| 3 | the agent is `blocked` | read its screen; answer with `send --force` only if the user said you may, otherwise tell the user |
+| 2 | the start failed, or the agent hit an error or its pane is gone | `muster status RUN`, then `retry` or tell the user |
+| 4 | `--timeout` passed | the runs are printed as they stand; wait again or check on them |
+
+- With several runs, `muster wait A B` returns when all have stopped and `muster wait --any A B` when the first has; it prints only the stopped ones, so wait again for the rest.
+- Add `--timeout 30m` when you must not wait forever.
+- After `send`, the run can still read as `waiting` for a moment, and a wait started then returns at once. Check that `muster status RUN` shows `running` before you wait again. `follow` does not have this problem.
+
 ## When something is wrong
 
 `muster doctor` checks the configuration and hooks and exits non-zero on a problem. Hook failures and every transition are logged in `$MUSTER_DIR/muster.log`.

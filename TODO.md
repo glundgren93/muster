@@ -24,7 +24,7 @@ All four slices are done; the open items left are marked `[ ]` below and in "Ask
 |---|---|
 | `docs/design.md` | open questions settled and recorded (see "Settled design questions") |
 | `internal/layout`, `config`, `state`, `hook`, `engine`, `plugin` | reviewed, fixed, tested |
-| `internal/cli`, `cmd/muster` | slice 1 commands: `start`, `status`, `tick`, `watch`, `done`, `retry`, `rm`, `doctor`, `version` |
+| `internal/cli`, `cmd/muster` | slice 1 commands: `start`, `status`, `tick`, `watch`, `done`, `retry`, `rm`, `doctor`, `version`; later `wait` (block until runs stop, with exit codes), checked live with the tmux + Claude Code preset |
 | Tests | unit tests per package plus an end-to-end test through the built binary |
 | Presets | `grove-rex-pi` and `worktree-tmux-claude`, both verified live |
 | Obsidian | `cmd/muster-obsidian`: `sync`, `watch`, `import-board` |

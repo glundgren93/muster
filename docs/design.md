@@ -200,6 +200,7 @@ Every command that prints runs accepts `-o table` (default) or `-o json`. A `RUN
 | `muster status [RUN]` | Reconcile, then list runs that are not `done`, ordered `waiting`, `failed`, `running`, `starting`, `queued`. `--all` includes `done`. `--cached` skips the reconcile. With `RUN`, show that run in full. A `waiting` run whose agent is `idle` and never reported `working` is shown as `idle, never worked`: the agent did not take up its prompt. |
 | `muster tick` | One reconcile and dispatch pass. Prints each transition. |
 | `muster watch` | Run passes every `interval` until interrupted. `--interval` overrides the setting. |
+| `muster wait RUN...` | Run passes every `interval` until every given run is `waiting`, `done` or `failed`, then print those runs. A run that is already in one of these statuses counts at once. `--any` returns when the first run gets there and prints only the runs that have. `--timeout D` gives up after `D` and prints every given run as it stands; the timeout is checked between passes and never interrupts a hook. `--interval` overrides the setting. Exit codes are below. |
 | `muster read RUN` | Print the agent's recent output through `read_agent`. `--lines N`, default 80. |
 | `muster send RUN MESSAGE` | Send text to the live agent through `send_agent`. Refuses when the agent reports `blocked`, unless `--force`. |
 | `muster follow RUN MESSAGE` | Add a follow-up, queue the run and dispatch. Requires at least one earlier session and a status of `waiting`, `done`, `failed` or `queued`. `--queue` as for `start`. |
@@ -212,9 +213,20 @@ Every command that prints runs accepts `-o table` (default) or `-o json`. A `RUN
 
 Errors go to stderr prefixed `muster:` and exit 1. An interrupt exits 130 after the current transition is saved; `muster watch` exits 0 on interrupt.
 
+`muster wait` exits with the worst result among the runs it prints, so a caller can branch without parsing:
+
+| Exit | Meaning |
+|---|---|
+| 0 | every run is `done`, or `waiting` with its agent `done` or `idle` |
+| 2 | a run is `failed`, or `waiting` with its agent in `error` or `gone` |
+| 3 | no run is as in 2, and a run is `waiting` with its agent `blocked` |
+| 4 | the timeout passed first |
+
+A caller that is notified when a background command exits, such as a coding agent, starts a run and leaves `muster wait` in the background to hear when the run needs it. `muster wait` needs no `muster watch`: its passes also start queued runs.
+
 The text argument of `start`, `send` and `follow` may start with `-` when whitespace follows the dashes, as in a Markdown bullet; such an argument is never read as a flag unless it is the value of the flag before it. Other text that starts with `-` goes after `--`.
 
-JSON output for a run is its record. `start`, `follow`, `retry` and `done` print the affected run; `start -o json` adds `"created": true` or `false`. `tick -o json` prints a list of `{id, from, to}`; `from` is empty for a creation. `status -o json` prints a list of records, or one record with `RUN`. `rm -o json` prints the removed record.
+JSON output for a run is its record. `wait -o json` prints a list of records. `start`, `follow`, `retry` and `done` print the affected run; `start -o json` adds `"created": true` or `false`. `tick -o json` prints a list of `{id, from, to}`; `from` is empty for a creation. `status -o json` prints a list of records, or one record with `RUN`. `rm -o json` prints the removed record.
 
 ## Plugins
 
