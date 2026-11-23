@@ -58,6 +58,7 @@ muster start "TASK"              # create a run and start an agent for it
 muster start -f task.md --workspace ~/src/app --model opus
 muster status                    # runs that need attention first; --all includes done ones
 muster status RUN                # one run in full
+muster board                     # the runs as a kanban board; drag cards between columns
 muster read RUN                  # the agent's recent output
 muster send RUN "yes, go ahead"  # type into the live agent
 muster follow RUN "now add tests"  # a new agent session in the same workspace, with context
@@ -71,6 +72,8 @@ muster watch                     # keep checking agents and starting queued runs
 `RUN` is a run id or a unique prefix of one. Every command that prints runs takes `-o json`.
 
 At most `max_running` agents run at once; the rest wait in the queue. `muster watch`, or `muster tick` from a scheduler, checks each agent's state and starts queued runs as slots free up. A run moves to `waiting` when its agent stops working, and an `on_waiting` hook can notify you.
+
+`muster board` shows the runs in columns by status: Queued, Running, Waiting, Done and Failed. Drag a card with the mouse, or select it and press `H` or `L`, to run the command that moves it: onto Done it runs `muster done`; onto Running or Queued it follows up on a waiting or done run (asking for the text), retries a failed one, or starts a queued one. Runs reach Waiting and Failed only on their own. `enter` shows a run in full, `o` the agent's output, `n` starts a new task and `x` removes a run. The board checks the agents every `interval`; `--watch` also starts queued runs, like `muster watch`.
 
 `muster wait RUN...` blocks until the runs are `waiting`, `done` or `failed` (`--any` for the first of several, `--timeout` to give up). It exits 0 when the agents finished, 3 when one is blocked on a question, 2 when one failed and 4 on a timeout. An agent that started a run can leave `muster wait` in a background command and is told when the run needs it.
 

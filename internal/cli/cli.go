@@ -64,6 +64,7 @@ func newRootCommand() *cobra.Command {
 	root.AddCommand(
 		newStartCommand(),
 		newStatusCommand(),
+		newBoardCommand(),
 		newTickCommand(),
 		newWatchCommand(),
 		newWaitCommand(),
